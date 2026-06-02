@@ -1,4 +1,4 @@
-(function() {
+document.addEventListener('DOMContentLoaded', () => {
     const dark_red = 'body-red-dark-district';
     const light_red = 'body-red-light-district';
     const light_green = 'body-green-light-district';
@@ -95,8 +95,7 @@
     updateSelectedCardUI(getCurrentTheme());
     
     const observer = new MutationObserver(() => {
-        const current = getCurrentTheme();
-        updateSelectedCardUI(current);
+        updateSelectedCardUI(getCurrentTheme());
     });
     
     observer.observe(body, { attributes: true, attributeFilter: ['class'] });

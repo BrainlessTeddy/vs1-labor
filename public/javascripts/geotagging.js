@@ -8,29 +8,7 @@
 // The console window must be opened explicitly in the browser.
 // Try to find this output in the browser...
 console.log("The geoTagging script is going to start...");
-
-// Here the API used for geolocations is selected
-// The following declaration is a 'mockup' that always works and returns a fixed position.
-GEOLOCATION_API = {
-    getCurrentPosition: function(onsuccess) {
-        onsuccess({
-            "coords": {
-                "latitude": 49.013790,
-                "longitude": 8.390071,
-                "altitude": null,
-                "accuracy": 39,
-                "altitudeAccuracy": null,
-                "heading": null,
-                "speed": null
-            },
-            "timestamp": 1775140116396
-        });
-    }
-};
-
-// This is the real API.
-// If there are problems with it, comment out the line.
-GEOLOCATION_API = navigator.geolocation;
+const GEOLOCATION_API = navigator.geolocation;
 
 /**
   * A class to help using the HTML5 Geolocation API.
@@ -85,7 +63,9 @@ class LocationHelper {
             // Pass the locationHelper object to the callback.
             callback(helper);
         }, (error) => {
-           alert(error.message)
+            alert(error.message)
+            let defaultHelper = new LocationHelper(49.013790, 8.390071);
+            callback(defaultHelper);
         });
     }
 }
@@ -94,7 +74,6 @@ class LocationHelper {
  * A class to help using the Leaflet map service.
  */
 class MapManager {
-
     #map
     #markers
 
@@ -105,6 +84,7 @@ class MapManager {
     * @param {number} zoom The map zoom, defaults to 18
     */
     initMap(latitude, longitude, zoom = 18) {
+        if (this.#map) this.destroyMap();
         // set up dynamic Leaflet map
         this.#map = L.map('map').setView([latitude, longitude], zoom);
         var mapLink = '<a href="http://openstreetmap.org">OpenStreetMap</a>';
@@ -141,47 +121,57 @@ class MapManager {
     }
 }
 
+let globalMapManager = null;
+
 /**
  * TODO: 'updateLocation'
  * A function to retrieve the current location and update the page.
  * It is called once the page has been fully loaded.
  */
 function updateLocation() {
-    LocationHelper.findLocation((locationHelper) => {
-        const tagLatInput = document.getElementById('t-lat');
-        const tagLonInput = document.getElementById('t-lon');
-        const searchLatInput = document.getElementById('s-lat');
-        const searchLonInput = document.getElementById('s-lon');
-        const lat = locationHelper.latitude;
-        const lon = locationHelper.longitude;
+    try {
+        LocationHelper.findLocation((locationHelper) => {
+            if (globalMapManager) globalMapManager.destroyMap();
+            globalMapManager = new MapManager();
 
-        if (tagLatInput) tagLatInput.value = lat;
-        if (tagLonInput) tagLonInput.value = lon;
-        if (searchLatInput) searchLatInput.value = lat;
-        if (searchLonInput) searchLonInput.value = lon;
+            const tagLatInput = document.getElementById('t-lat');
+            const tagLonInput = document.getElementById('t-lon');
+            const searchLatInput = document.getElementById('s-lat');
+            const searchLonInput = document.getElementById('s-lon');
+            const lat = locationHelper.latitude;
+            const lon = locationHelper.longitude;
 
-        const mapManager = new MapManager();
-        mapManager.initMap(parseFloat(lat), parseFloat(lon));
+            if (tagLatInput) tagLatInput.value = lat;
+            if (tagLonInput) tagLonInput.value = lon;
+            if (searchLatInput) searchLatInput.value = lat;
+            if (searchLonInput) searchLonInput.value = lon;
 
-        // All markers
-        const resultItems = document.querySelectorAll('.discovery__results li');
-        const geoTags = [];
-        resultItems.forEach(item => {
-            const text = item.textContent;
-            const coordMatch = text.match(/\(([-\d.]+),\s*([-\d.]+)\)/);
-            if (coordMatch) {
-                geoTags.push({
-                    latitude:  parseFloat(coordMatch[1]),
-                    longitude: parseFloat(coordMatch[2]),
-                    name:      text.split('(')[0].trim()
-                });
-            }
+            globalMapManager.initMap(parseFloat(lat), parseFloat(lon));
+
+            // All markers
+            const resultItems = document.querySelectorAll('.discovery__results li');
+            const geoTags = [];
+            resultItems.forEach(item => {
+                const text = item.textContent;
+                const coordMatch = text.match(/\(([-\d.]+),\s*([-\d.]+)\)/);
+                if (coordMatch) {
+                    geoTags.push({
+                        latitude:  parseFloat(coordMatch[1]),
+                        longitude: parseFloat(coordMatch[2]),
+                        name:      text.split('(')[0].trim()
+                    });
+                }
+            });
+
+            // Two lines of code: 1. only show current location. 2. show all tags
+            // mapManager.updateMarkers(parseFloat(lat), parseFloat(lon));
+            globalMapManager.updateMarkers(parseFloat(lat), parseFloat(lon), geoTags);
+            console.log(`Location found: Lat=${lat}, Lon=${lon}`);
         });
-
-        // mapManager.updateMarkers(parseFloat(lat), parseFloat(lon));
-        mapManager.updateMarkers(parseFloat(lat), parseFloat(lon), geoTags);
-        console.log(`Location found: Lat=${lat}, Lon=${lon}`);
-    });
+    } catch(e) {
+        console.error(e);
+        alert("Geolocation is not supported by your browser. Using default location.");
+    }
 }
 
 // Wait for the page to fully load its DOM content, then call updateLocation
